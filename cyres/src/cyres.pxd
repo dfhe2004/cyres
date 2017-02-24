@@ -8,3 +8,4 @@ cdef class CostFunction:
 
 cdef class LossFunction:
     cdef ceres.LossFunction* _loss_function
+

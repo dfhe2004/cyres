@@ -47,7 +47,7 @@ cdef class CostFunction:
 
     cpdef parameter_block_sizes(self):
         block_sizes = []
-        cdef vector[ceres.int16] _parameter_block_sizes = self._cost_function.parameter_block_sizes()
+        cdef vector[ceres.int32] _parameter_block_sizes = self._cost_function.parameter_block_sizes()
         for i in range(_parameter_block_sizes.size()):
             block_sizes.append(_parameter_block_sizes[i])
         return block_sizes
@@ -107,6 +107,7 @@ cdef class CostFunction:
             return residuals, jacobians
         else:
             return residuals
+
 
 cdef class SquaredLoss(LossFunction):
     def __cinit__(self):

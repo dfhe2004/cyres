@@ -1,5 +1,5 @@
 from cyres import *
-from cost_functions.wrappers import SimpleCostF_1x1f8
+from cost_functions.wrappers import DynNumDiffCostF
 from IPython import embed
 
 
@@ -12,7 +12,7 @@ x = np.array([5.])
 problem = Problem()
 
 
-problem.add_residual_block(SimpleCostF_1x1f8(foo, diff_type='numeric'), SquaredLoss(), [x]) # auto doesn't work. fix it later!!!
+problem.add_residual_block(DynNumDiffCostF(foo, 1,1,  diff_type='numeric'), SquaredLoss(), [x]) # auto doesn't work. fix it later!!!
 
 options = SolverOptions()
 options.max_num_iterations = 50
