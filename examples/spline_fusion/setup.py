@@ -20,10 +20,13 @@ ceres_lib = r"D:\cxxlibs\3rd_party\lib" #"/usr/local/lib/"
 ext_modules = [
     Extension(
         "wrappers",
-        ["cost_functions/wrappers.pyx"],
+        ["cost_functions/wrappers.pyx",],
         language="c++",
+        extra_compile_args=["-Zi", "/Od"],
+        #extra_link_args=["-debug",],
         include_dirs=[ceres_include, ceres_cfg, numpy.get_include(), eigen_include],
-        libraries=['ceres','gflags', 'libglog', ],
+        #libraries=['ceresd','gflags', 'libglog','pydbg' ],
+        libraries=['ceres','gflags', 'libglog','pydbg' ],
         library_dirs=[ceres_lib,],
         cython_include_dirs=[cyres.get_cython_include()],
     )

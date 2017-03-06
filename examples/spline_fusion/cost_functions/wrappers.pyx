@@ -1,96 +1,88 @@
+import cython
+#from libcpp.vector cimport vector
+from cpython.object cimport PyObject
 
-from cyres cimport CostFunction  #, LossFunction
-cimport ceres
 cimport numpy as np
-#from cython cimport view
 
-from IPython import embed
-#from libc.stdlib cimport malloc
-#import sys
+#from IPython import embed
+import sys
 
+import numpy as np
 np.import_array()
+  
 
 
-cdef extern from "cost_functions.h":
-    ctypedef void (*Method_1x1f8)(object pyfun, void* x0, void* residual, object args)
-    ctypedef void (*Method_2x1f8)(object pyfun, void* x0, void* x1, void* residual, object args)
-    ctypedef void (*Method_dyn_num_f8)(object pyfun, void* x0, void* residual, object args, int, int)
+#cdef extern from "python.h":
+#    void Py_IncRef(PyObject*)
+#    void Py_DecRef(PyObject*)
+
+cdef extern from "spline_fusion.h":
+    void spline_fusion(const double* ref, const double* ref_norm, const double* ref_ts, const double* src, const double* src_ts, const int* tiles, size_t num_tiles, double ts_offset, double ts_step, double* params_data, size_t num_params )
     
-
-    ceres.CostFunction* createCostFunAutoDiff_1x1f8(Method_1x1f8 cyfun, object pyfun, object args)
-    ceres.CostFunction* createCostFunAutoDiff_2x1f8(Method_2x1f8 cyfun, object pyfun, object args)
-
-    ceres.CostFunction* createNumericDiffCostFun_1x1f8(Method_1x1f8 cyfun, object pyfun, object args)
-    ceres.CostFunction* createNumericDiffCostFun_2x1f8(Method_2x1f8 cyfun, object pyfun, object args)
-    ceres.CostFunction* createDynamicNumericDiffCostFun(Method_dyn_num_f8 cyfun, object pyfun, object args, int, int)
-
-
-
-#-- call back 
-cdef void callback_1x1f8(object pyfun, void* x0, void* rs, object args):
-    cdef np.npy_intp _shape[1]
-    
-    _shape[0] = <np.npy_intp>1 
-    arr_x0 = np.PyArray_SimpleNewFromData(1, _shape, np.NPY_FLOAT64, x0)
-    arr_rs = np.PyArray_SimpleNewFromData(1, _shape, np.NPY_FLOAT64, rs)
-    pyfun(arr_x0, arr_rs, args)
-
-
-cdef void callback_2x1f8(object pyfun, void* x0, void* x1, void* rs, object args):
-    cdef np.npy_intp _shape[1]
-    
-    _shape[0] = <np.npy_intp>1 
-    arr_x0 = np.PyArray_SimpleNewFromData(1, _shape, np.NPY_FLOAT64, x0)
-    arr_x1 = np.PyArray_SimpleNewFromData(1, _shape, np.NPY_FLOAT64, x1)
-    arr_rs = np.PyArray_SimpleNewFromData(1, _shape, np.NPY_FLOAT64, rs)
-    pyfun(arr_x0, arr_x1, arr_rs, args)
-
-
-cdef void callback_dyna_num_f8(object pyfun, void* x0, void* rs, object args, int nParams, int nRes):
-    cdef np.npy_intp _shape[1]
-    
-    _shape[0] = <np.npy_intp>nParams 
-    cdef double** ptr = <double**>x0
-    arr_x0 = np.PyArray_SimpleNewFromData(1, _shape, np.NPY_FLOAT64, ptr[0])
-
-    _shape[0] = <np.npy_intp>nRes 
-    arr_rs = np.PyArray_SimpleNewFromData(1, _shape, np.NPY_FLOAT64, rs)
-    pyfun(arr_x0, arr_rs, args)
-
-
-
 
 #--- interface 
-cdef class SimpleCostF_1x1f8(CostFunction):
-    def __cinit__(self, pyfun, args=None, diff_type='numeric'):
-        if diff_type=='auto':
-            self._cost_function = createCostFunAutoDiff_1x1f8(callback_1x1f8, pyfun, args)
-            return
-        
-        if diff_type=='numeric':
-            self._cost_function = createNumericDiffCostFun_1x1f8(callback_1x1f8, pyfun, args)
-            return
-        
-        
-
-cdef class SimpleCostF_2x1f8(CostFunction):
-    def __cinit__(self, pyfun, args=None, diff_type='numeric'):
-        if diff_type=='auto':
-            self._cost_function = createCostFunAutoDiff_2x1f8(callback_2x1f8, pyfun, args)
-            return
-
-        if diff_type=='numeric':
-            self._cost_function = createNumericDiffCostFun_2x1f8(callback_2x1f8, pyfun, args)
-            return
+cpdef py_spline_fusion(np.ndarray ref, np.ndarray ref_norm, np.ndarray ref_ts
+    , np.ndarray src, np.ndarray src_ts, np.ndarray tiles
+    , np.ndarray params, double ts_offset, double ts_step): 
+    
+    #-- check size
+    _sz = ref.shape[0]
+    
+    assert ref.shape[1] == 3            # nx3
+    assert ref_norm.shape[0]==_sz and ref_norm.shape[1]==3   # nx3
+    assert ref_ts.shape[0] == _sz       # nx1
+    
+    assert src.shape[0]==_sz and src.shape[1]==3        # nx3
+    assert src_ts.shape[0]==_sz         # nx1
+       
+    assert tiles.shape[1]==2            # tx2
+    assert params.shape[1]==7, 'params.shape %s|%s'%(params.shape[0],params.shape[1])           # mx7
 
 
+    #-- prepare data
+    #Py_IncRef(<PyObject*>ref)
+    #print sys.getrefcount(ref)
+    cdef np.ndarray _tmp_ref = np.ascontiguousarray(ref, dtype=np.double)
+    cdef const double* _ref = <const double*> _tmp_ref.data
 
-cdef class DynNumDiffCostF(CostFunction):
-    def __cinit__(self, pyfun, nParams, nRes, args=None, diff_type='numeric'):
-        if diff_type=='numeric':
-            self._cost_function = createDynamicNumericDiffCostFun(
-                callback_dyna_num_f8, pyfun, args, nParams, nRes)
-            return
+    #Py_IncRef(<PyObject*>ref_norm)
+    cdef np.ndarray _tmp_ref_norm = np.ascontiguousarray(ref_norm, dtype=np.double)
+    cdef const double* _ref_norm = <const double*> _tmp_ref_norm.data
 
+    #Py_IncRef(<PyObject*>ref_ts)
+    cdef np.ndarray _tmp_ref_ts = np.ascontiguousarray(ref_ts, dtype=np.double)
+    cdef const double* _ref_ts = <const double*> _tmp_ref_ts.data
 
+    #Py_IncRef(<PyObject*>src)
+    cdef np.ndarray _tmp_src = np.ascontiguousarray(src, dtype=np.double)
+    cdef const double* _src = <const double*> _tmp_src.data
 
+    #Py_IncRef(<PyObject*>src_ts)
+    cdef np.ndarray _tmp_src_ts = np.ascontiguousarray(src_ts, dtype=np.double)
+    cdef const double* _src_ts = <const double*> _tmp_src_ts.data
+
+    #Py_IncRef(<PyObject*>tiles)
+    cdef np.ndarray _tmp_tiles = np.ascontiguousarray(tiles, dtype=np.int32)
+    cdef const int* _tiles = <const int*> _tmp_tiles.data
+
+    #Py_IncRef(<PyObject*>params)
+    cdef np.ndarray _tmp_params = np.ascontiguousarray(params, dtype=np.double)
+    cdef double* _params = <double*> _tmp_params.data
+
+    cdef size_t num_tiles = tiles.shape[0]
+    cdef size_t num_params = params.shape[0]
+
+    #-- pass to spline_fusion
+    spline_fusion(_ref, _ref_norm,  _ref_ts, _src,   _src_ts, _tiles, num_tiles, ts_offset,  ts_step, _params, num_params)
+    
+    #Py_DecRef(<PyObject*>ref)
+    #Py_DecRef(<PyObject*>ref_norm)
+    #Py_DecRef(<PyObject*>ref_ts)
+    #Py_DecRef(<PyObject*>src)
+    #Py_DecRef(<PyObject*>src_ts)
+    #Py_DecRef(<PyObject*>tiles)
+    #Py_DecRef(<PyObject*>params)
+
+    #print sys.getrefcount(ref)
+
+ 

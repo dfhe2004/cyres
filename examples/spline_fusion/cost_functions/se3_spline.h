@@ -33,7 +33,6 @@ public:
     typedef SE3Group<T> SE3Type;
     typedef Eigen::Matrix<T, 4, 4> SE3DerivType;
     typedef Eigen::Matrix<T, 3, 1> Vec3;
-	typedef std::map<size_t, T*>   MapType;
 
     UniformSpline(const double offset=0.0, const double dt=1.0) : offset_(offset), dt_(dt){};
 
@@ -42,11 +41,11 @@ public:
 		knots_.push_back(data);
 	}
 
-    Eigen::Map<SE3Type> get_knot(size_t k) const {
-        return Eigen::Map<SE3Type>(knots_[k]);
+    Eigen::Map<SE3Type> get_knot(size_t i) const {
+        return Eigen::Map<SE3Type>(knots_[i]);
     }
 
-    double* get_knot_data(size_t k) const{
+    double* get_knot_data(size_t i) const{
 		if (i < knots_.size()) {
             return knots_[i];
         }
@@ -54,6 +53,7 @@ public:
             throw std::out_of_range("Knot does not exist");
         }
     }
+
 
     /** Evaluate spline (pose and its derivative)
      * This gives the current pose and derivative of the spline.
@@ -80,17 +80,6 @@ public:
         else
             return 0.0;
     };
-
-    void zero_knots(double* data, size_t n) {
-        knots_.clear();
-        SE3Type identity;
-        for (size_t i=0; i < n; ++i) {
-            //double* data = new double[SE3Type::num_parameters];
-            memcpy(data, identity.data(), sizeof(data[0]) * SE3Type::num_parameters);
-            knots_.push_back(data);
-            data +=SE3Type::num_parameters; 
-        }
-    }
 
 protected:
     double dt_;
@@ -121,5 +110,25 @@ void UniformSpline<T>::evaluate(T t, SE3Type &P) const {
         P *= Aj;
     }
 }
+
+/*
+void spline_evaluate(double* out, const double* weights,  const double* knots){
+    const size_t stride = SE3Type::num_parameters;
+	//const double* itr = knots+i*stride;
+	
+	SE3Type P = Eigen::Map<SE3Type>(knots);		// inplace ??
+	knots += stride;
+    for(size_t j=1; j!=4; ++j) {
+        Eigen::Map<SE3Type> knot1 = Eigen::Map<SE3Type>(knots-stride);
+        Eigen::Map<SE3Type> knot2 = Eigen::Map<SE3Type>(knots);
+        typename SE3Type::Tangent omega = SE3Type::log(knot1.inverse() * knot2);
+        Eigen::Matrix<T, 4, 4> omega_hat = SE3Type::hat(omega);
+        SE3Type Aj = SE3Type::exp(weight[j] * omega);
+        P *= Aj;
+		knots += stride;
+    }
+	memcopy(out, P.data(), sizeof(out[0])*SE3Type::num_parameters);
+}
+*/
 
 #endif //SE3_SPLINE_H
