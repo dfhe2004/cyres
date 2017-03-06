@@ -1,11 +1,12 @@
 import cython
+from libcpp cimport bool
 #from libcpp.vector cimport vector
-from cpython.object cimport PyObject
+#from cpython.object cimport PyObject
 
 cimport numpy as np
 
 #from IPython import embed
-import sys
+#import sys
 
 import numpy as np
 np.import_array()
@@ -19,6 +20,9 @@ np.import_array()
 cdef extern from "spline_fusion.h":
     void spline_fusion(const double* ref, const double* ref_norm, const double* ref_ts, const double* src, const double* src_ts, const int* tiles, size_t num_tiles, double ts_offset, double ts_step, double* params_data, size_t num_params )
     
+cdef extern from "se3_spline.h":
+    void spline_evaluate(double* out, double* se3, const double* xyz, const double* weights,  const double* knots)
+
 
 #--- interface 
 cpdef py_spline_fusion(np.ndarray ref, np.ndarray ref_norm, np.ndarray ref_ts
@@ -85,4 +89,27 @@ cpdef py_spline_fusion(np.ndarray ref, np.ndarray ref_norm, np.ndarray ref_ts
 
     #print sys.getrefcount(ref)
 
- 
+
+cpdef py_spline_eval(np.ndarray xyz, np.ndarray weights, np.ndarray knots, bool return_se3=False):
+    cdef np.ndarray _tmp_out = np.empty_like(xyz, dtype=np.double)
+    cdef double* _out = <double*> _tmp_out.data
+    
+    cdef np.ndarray _tmp_xyz = np.ascontiguousarray(xyz, dtype=np.double)
+    cdef const double* _xyz = <const double*> _tmp_xyz.data
+
+    cdef np.ndarray _tmp_weights = np.ascontiguousarray(weights, dtype=np.double)
+    cdef const double* _weights = <const double*> _tmp_weights.data
+    
+    cdef np.ndarray _tmp_knots = np.ascontiguousarray(knots, dtype=np.double)
+    cdef const double* _knots = <const double*> _tmp_knots.data
+    
+    
+    if(not return_se3):
+        spline_evaluate(_out, NULL, _xyz, _weights, _knots)
+        return _tmp_out
+    
+    cdef np.ndarray _tmp_se3 = np.empty(7, dtype=np.double)
+    cdef double* _se3 = <double*> _tmp_se3.data
+    spline_evaluate(_out, _se3, _xyz, _weights, _knots)
+    return _tmp_out, _tmp_se3
+    

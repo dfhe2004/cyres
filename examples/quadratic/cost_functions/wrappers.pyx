@@ -10,7 +10,7 @@ from IPython import embed
 
 np.import_array()
 
-
+ 
 cdef extern from "cost_functions.h":
     ctypedef void (*Method_1x1f8)(object pyfun, void* x0, void* residual, object args)
     ctypedef void (*Method_2x1f8)(object pyfun, void* x0, void* x1, void* residual, object args)

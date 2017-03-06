@@ -4,8 +4,10 @@
 #include <vector>
 #include <map>
 #include <iostream>
+#include <cstring>
 using std::cout;
 using std::endl;
+using std::memcpy;
 #include <math.h>
 
 #include <ceres/jet.h>
@@ -111,24 +113,34 @@ void UniformSpline<T>::evaluate(T t, SE3Type &P) const {
     }
 }
 
-/*
-void spline_evaluate(double* out, const double* weights,  const double* knots){
-    const size_t stride = SE3Type::num_parameters;
-	//const double* itr = knots+i*stride;
+void spline_evaluate(double* out, double* se3, const double* xyz, const double* weights,  const double* knots){
+    typedef UniformSpline<double>::SE3Type	_SE3Type;
+	typedef Eigen::Map<_SE3Type>			_MapType;
+	typedef Eigen::Matrix<double, 3, 1>		_M3x1;
 	
-	SE3Type P = Eigen::Map<SE3Type>(knots);		// inplace ??
+	const size_t stride = _SE3Type::num_parameters;
+	
+	_SE3Type P = _MapType((double*)knots);		// inplace ??
 	knots += stride;
     for(size_t j=1; j!=4; ++j) {
-        Eigen::Map<SE3Type> knot1 = Eigen::Map<SE3Type>(knots-stride);
-        Eigen::Map<SE3Type> knot2 = Eigen::Map<SE3Type>(knots);
-        typename SE3Type::Tangent omega = SE3Type::log(knot1.inverse() * knot2);
-        Eigen::Matrix<T, 4, 4> omega_hat = SE3Type::hat(omega);
-        SE3Type Aj = SE3Type::exp(weight[j] * omega);
+        _SE3Type knot1 = _MapType((double*)(knots-stride));
+        _SE3Type knot2 = _MapType((double*)knots);
+        _SE3Type::Tangent omega = _SE3Type::log(knot1.inverse() * knot2);
+        Eigen::Matrix<double, 4, 4> omega_hat = _SE3Type::hat(omega);
+        _SE3Type Aj = _SE3Type::exp(weights[j] * omega);
         P *= Aj;
 		knots += stride;
     }
-	memcopy(out, P.data(), sizeof(out[0])*SE3Type::num_parameters);
+	
+	_M3x1 pt = _M3x1(xyz);
+	pt = P*pt;
+
+	memcpy(out, pt.data(), sizeof(pt));
+	if (se3!=NULL){
+		memcpy(se3, P.data(), sizeof(se3[0])*_SE3Type::num_parameters );
+	}
 }
-*/
+
+
 
 #endif //SE3_SPLINE_H

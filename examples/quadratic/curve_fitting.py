@@ -3,6 +3,8 @@ from cost_functions.wrappers import SimpleCostF_2x1f8
 from IPython import embed
 import numpy
 
+embed()
+
 other = {'k': []}
 i = 0
 

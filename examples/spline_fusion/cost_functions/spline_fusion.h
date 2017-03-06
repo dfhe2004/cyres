@@ -19,7 +19,6 @@ using std::endl;
 struct SplineConstraint {
 	typedef Eigen::Matrix<double, 3, 1> M3x1;
     typedef UniformSpline<double>       SplineType;
-    //typedef UniformSpline<const double> SplineConstType;
 
     SplineConstraint(double ts_offset, double ts_step, size_t num_params): 
         ts_offset_(ts_offset), ts_step_(ts_step), num_params_(num_params){}
@@ -49,9 +48,7 @@ struct SplineConstraint {
         for (size_t i=0; i < num_params_; ++i) {
             _spline.add_knot((T*)(&parameters[i][0]));
         }
-		
-		_var_dump0(100);
-
+		//_var_dump0(100);
 		for (size_t i=0; i!=num_tiles_; ++i){
 			size_t begin = tiles_[i*2];
 			size_t end = tiles_[i*2+1];
@@ -70,29 +67,26 @@ struct SplineConstraint {
 			M3x1 cur_src  = M3x1(&src_[i*3]);
 
 			//_var_dump4(200, i, ref_, ref_norm_, src_);
-			_var_dump4(201, i, cur_ref.data(), cur_norm.data(), cur_src.data());
+			//_var_dump4(201, i, cur_ref.data(), cur_norm.data(), cur_src.data());
 
             SE3Group<double> P0, P1;
             spline.evaluate( ref_ts_[i], P0);
             spline.evaluate( src_ts_[i], P1);
 			
-			_var_dump2(202, P0.matrix().data(), P1.matrix().data());
+			//_var_dump2(202, P0.matrix().data(), P1.matrix().data());
 
 			//-- apply P0, P1 to cur_ref ,cur_norm and cur_src
 			cur_ref  = P0*cur_ref;
 			cur_src  = P1*cur_src;
 			cur_norm = P0.so3()*cur_norm;
 			
-			
-			_var_dump3(203, cur_ref.data(), cur_src.data(), cur_norm.data());
-			
+			//_var_dump3(203, cur_ref.data(), cur_src.data(), cur_norm.data());
 			cur_norm.normalize();
-			
-			_var_dump1(204, cur_norm.data());
+			//_var_dump1(204, cur_norm.data());
 
 			double diff = cur_norm.dot(cur_ref-cur_src); 
 			rs += abs(diff);
-			_var_dump2(205, &rs, &diff);
+			//_var_dump2(205, &rs, &diff);
 		}
 		return rs;
     }
@@ -145,7 +139,6 @@ void run_solver(CostFunType* cost_func, ceres::Solver::Options& solver_options, 
 
     // Set residual count
     cost_func->SetNumResiduals(num_res);
-    
     ceres::Problem problem;
 
     // Local parameterization
@@ -201,12 +194,11 @@ void spline_fusion(
     cout << "\n\n------------------------- NUMERIC ------------------------------------" << endl;
     CostFunType* cost_func_numeric = new CostFunType(constraint);
     
-	_var_dump5(300, ref, ref_norm, ref_ts, src, src_ts);
-	_var_dump4(301, tiles, num_tiles, &ts_offset, &ts_step);
-	_var_dump2(302, params_data, num_params);
+	//_var_dump5(300, ref, ref_norm, ref_ts, src, src_ts);
+	//_var_dump4(301, tiles, num_tiles, &ts_offset, &ts_step);
+	//_var_dump2(302, params_data, num_params);
 
     run_solver(cost_func_numeric, solver_options, params_data, num_params, num_tiles);
-
 }
 
 
