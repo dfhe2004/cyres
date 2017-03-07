@@ -51,13 +51,17 @@ def _prepare_data():
     _ts = numpy.random.randn(30)
     _ts.sort()
     _ts -= _ts[0]/_ts[-1]*10        # 10s
+    
+    ts_offset = _ts[0]
+    ts_step = 1.0
+    _ts = (_ts-ts_offset)/ts_step   # convert to local ts
 
     ref = numpy.random.randn(10,3)
-    ref_norm = numpy.random.randn(10,3)
-    ref_norm = ref_norm/numpy.linalg.norm(ref_norm,axis=1).reshape(-1,1)
     ref_ts = _ts[4:14]
 
     src = numpy.random.randn(10,3)
+    src_norm = numpy.random.randn(10,3)
+    src_norm = src_norm/numpy.linalg.norm(src_norm,axis=1).reshape(-1,1)
     src_ts = _ts[14:24]
 
     tiles = numpy.array([
@@ -65,14 +69,12 @@ def _prepare_data():
         [3,10],
     ], dtype='i4')
 
-    ts_offset = _ts[0]
-    ts_step = 1.0
     params = numpy.empty((15,7), dtype='f8')
     return {
         'ref':      ref,
-        'ref_norm': ref_norm,
         'ref_ts':   ref_ts,
         'src':      src,
+        'src_norm': src_norm,
         'src_ts':   src_ts,
         'tiles':    tiles,
         'params':   params,
@@ -91,12 +93,12 @@ if __name__=='__main__':
         numpy.savez('d:/workspace/spline_fusion.npz',**_data)
     
     if 1:   #-- fusion
-        _args = [ _data[k] for k in 'ref,ref_norm,ref_ts,src,src_ts,tiles,params,ts_offset,ts_step'.split(',') ]
+        _args = [ _data[k] for k in 'ref,ref_ts,src,src_norm,src_ts,tiles,params'.split(',') ]
         py_spline_fusion(*_args)
         
         #print params
         
-    if 0:   #-- apply spline
+    if 1:   #-- apply spline
         spline = Spline(_data['ts_offset'], _data['ts_step'], _data['params'])
         ref_h = spline.trans(_data['ref'], _data['ref_ts'])
         ref_h2, ref_se3 = spline.trans(_data['ref'], _data['ref_ts'], return_se3=True)

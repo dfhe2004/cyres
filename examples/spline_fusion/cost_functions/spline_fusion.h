@@ -20,17 +20,17 @@ struct SplineConstraint {
 	typedef Eigen::Matrix<double, 3, 1> M3x1;
     typedef UniformSpline<double>       SplineType;
 
-    SplineConstraint(double ts_offset, double ts_step, size_t num_params): 
-        ts_offset_(ts_offset), ts_step_(ts_step), num_params_(num_params){}
+    SplineConstraint(size_t num_params): 
+        num_params_(num_params){}
 
-    void set_arr_ref(const double* ref, const double* ref_norm, const double* ref_ts){
+    void set_arr_ref(const double* ref,const double* ref_ts){
         ref_ = ref;
-        ref_norm_ = ref_norm;
         ref_ts_ = ref_ts;
     }
     
-    void set_arr_src(const double* src, const double* src_ts){
+    void set_arr_src(const double* src, const double* src_norm,  const double* src_ts){
         src_= src;
+        src_norm_ = src_norm;
         src_ts_ = src_ts;
     }
 
@@ -44,7 +44,7 @@ struct SplineConstraint {
     template<typename T>
     bool operator()(T const* const* parameters, T* residuals) const {
 		// update spline
-        SplineType _spline(ts_offset_, ts_step_);
+        SplineType _spline;
         for (size_t i=0; i < num_params_; ++i) {
             _spline.add_knot((T*)(&parameters[i][0]));
         }
@@ -63,8 +63,8 @@ struct SplineConstraint {
 		double rs = 0;
 		for(size_t i=begin; i!=end; ++i){
 			M3x1 cur_ref = M3x1(&ref_[i*3]);
-			M3x1 cur_norm = M3x1(&ref_norm_[i*3]);
 			M3x1 cur_src  = M3x1(&src_[i*3]);
+			M3x1 cur_norm = M3x1(&src_norm_[i*3]);
 
 			//_var_dump4(200, i, ref_, ref_norm_, src_);
 			//_var_dump4(201, i, cur_ref.data(), cur_norm.data(), cur_src.data());
@@ -78,7 +78,7 @@ struct SplineConstraint {
 			//-- apply P0, P1 to cur_ref ,cur_norm and cur_src
 			cur_ref  = P0*cur_ref;
 			cur_src  = P1*cur_src;
-			cur_norm = P0.so3()*cur_norm;
+			cur_norm = P1.so3()*cur_norm;
 			
 			//_var_dump3(203, cur_ref.data(), cur_src.data(), cur_norm.data());
 			cur_norm.normalize();
@@ -91,14 +91,11 @@ struct SplineConstraint {
 		return rs;
     }
 
-    double ts_offset_;
-    double ts_step_;
-
 	const double* ref_; 
-	const double* ref_norm_;
 	const double* ref_ts_;
 		
 	const double* src_; 
+	const double* src_norm_;
 	const double* src_ts_;
 			
 	const int* tiles_;
@@ -127,12 +124,7 @@ void run_solver(CostFunType* cost_func, ceres::Solver::Options& solver_options, 
 
 	for (size_t i=0; i < num_params; ++i) {
         parameter_blocks.push_back(&params[i*_stride]);
-		const std::vector<int>& xx = cost_func->parameter_block_sizes();
-		std::vector<int>* pxx = (std::vector<int>*)&xx;
-		size_t vv = pxx->size();
-		pxx->push_back(_stride);
-		vv = pxx->size();
-        //cost_func->AddParameterBlock(_stride); 
+        cost_func->AddParameterBlock(_stride); 
     }
 
 	//_var_dump1(401, &parameter_blocks);
@@ -158,25 +150,21 @@ void run_solver(CostFunType* cost_func, ceres::Solver::Options& solver_options, 
 
 void spline_fusion(
 	const double* ref,		// for constrain
-	const double* ref_norm,
 	const double* ref_ts,
 	const double* src,
+	const double* src_norm,
 	const double* src_ts,
 	const int* tiles,
 	size_t num_tiles,
 
-	double ts_offset,		// for spline
-	double ts_step,
 	double* params_data,	// output [num_params,7]
-	size_t num_params			 
+	size_t num_params,
+	size_t max_solver_time
 	) {
-    //-- prepare spline
-    //UniformSpline<double> spline = create_zero_spline(ts_offset, ts_step, params_data, num_params);
-
 	//-- prepare constrain
-    SplineConstraint* constraint = new SplineConstraint(ts_offset, ts_step, num_params);
-    constraint->set_arr_ref(ref, ref_norm, ref_ts);
-    constraint->set_arr_src(src, src_ts);
+    SplineConstraint* constraint = new SplineConstraint(num_params);
+    constraint->set_arr_ref(ref, ref_ts);
+    constraint->set_arr_src(src, src_norm, src_ts);
     constraint->set_arr_tiles(tiles, num_tiles);
 
     init_params(params_data, num_params);
@@ -184,7 +172,7 @@ void spline_fusion(
 
     // Solver options
     ceres::Solver::Options solver_options;
-    solver_options.max_solver_time_in_seconds = 60;
+    solver_options.max_solver_time_in_seconds = max_solver_time;
     solver_options.linear_solver_type = ceres::SPARSE_SCHUR;
     solver_options.minimizer_progress_to_stdout = true;
     solver_options.parameter_tolerance = 1e-4;

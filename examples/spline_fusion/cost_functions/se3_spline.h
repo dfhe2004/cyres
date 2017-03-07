@@ -36,8 +36,6 @@ public:
     typedef Eigen::Matrix<T, 4, 4> SE3DerivType;
     typedef Eigen::Matrix<T, 3, 1> Vec3;
 
-    UniformSpline(const double offset=0.0, const double dt=1.0) : offset_(offset), dt_(dt){};
-
     size_t num_knots() const { return knots_.size(); }
     void add_knot(T* data){
 		knots_.push_back(data);
@@ -65,27 +63,18 @@ public:
      */
     void evaluate(T t, SE3Type& P) const;
 
-    double get_dt() const { return dt_; };
-
-    double get_offset() const { return offset_; };
-
     double min_time() const {
-        if (num_knots() > 0)
-            return offset_;
-        else
-            return 0.0;
+		return 0.0;
     };
 	
     double max_time() const {
         if (num_knots() > 0)
-            return offset_ + (dt_ * (num_knots() - 3));
+            return num_knots() - 3;
         else
             return 0.0;
     };
 
 protected:
-    double dt_;
-    double offset_;
 	std::vector<T*> knots_;
 };
 
@@ -96,9 +85,8 @@ void UniformSpline<T>::evaluate(T t, SE3Type &P) const {
     typedef Eigen::Map<SE3Type> KnotMap;
 	
 	// Remove offset
-    T s = (t - T(offset_)) / T(dt_); // Spline normalized time (offset aware)
-    T u = s - floor(s);				
-	size_t i0 = floor(s);			 // [0,n-3)
+	size_t i0 = floor(t);			 // [0,n-3)
+    T u = t - i0;				
 
     P = Eigen::Map<SE3Type>(knots_[i0]);
     Vec4 B = spline_B(u);

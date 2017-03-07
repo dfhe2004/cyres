@@ -22,8 +22,9 @@ ext_modules = [
         "wrappers",
         ["cost_functions/wrappers.pyx",],
         language="c++",
-        extra_compile_args=["-Zi", "/Od"],
+        #extra_compile_args=["-Zi", "/Od"], #debug
         #extra_link_args=["-debug",],
+        extra_compile_args=["/O2"],     #release
         include_dirs=[ceres_include, ceres_cfg, numpy.get_include(), eigen_include],
         #libraries=['ceresd','gflags', 'libglog','pydbg' ],
         libraries=['ceres','gflags', 'libglog','pydbg' ],
