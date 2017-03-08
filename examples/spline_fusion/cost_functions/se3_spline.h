@@ -129,6 +129,10 @@ void spline_evaluate(double* out, double* se3, const double* xyz, const double* 
 	}
 }
 
-
+void se3_to_matrix(double* out, double* se3){
+    typedef UniformSpline<double>::SE3Type	_SE3Type;
+	typedef Eigen::Map<_SE3Type>			_MapType;
+	memcpy(out, _MapType(se3).matrix().data(), sizeof(se3[0])*16);
+}
 
 #endif //SE3_SPLINE_H

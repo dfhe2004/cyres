@@ -18,12 +18,11 @@ np.import_array()
 #    void Py_DecRef(PyObject*)
 
 cdef extern from "spline_fusion.h":
-    void spline_fusion(const double* ref, const double* ref_ts, const double* src, const double* src_norm, const double* src_ts, const int* tiles, size_t num_tiles, double* params_data, size_t num_params, size_t max_solver_time
- )
+    void spline_fusion(const double* ref, const double* ref_ts, const double* src, const double* src_norm, const double* src_ts, const int* tiles, size_t num_tiles, double* params_data, size_t num_params, size_t max_solver_time)
     
 cdef extern from "se3_spline.h":
     void spline_evaluate(double* out, double* se3, const double* xyz, const double* weights,  const double* knots)
-
+    void se3_to_matrix(double* out, double* se3)
 
 #--- interface 
 cpdef py_spline_fusion(np.ndarray ref, np.ndarray ref_ts
@@ -101,3 +100,15 @@ cpdef py_spline_eval(np.ndarray xyz, np.ndarray weights, np.ndarray knots, bool 
     spline_evaluate(_out, _se3, _xyz, _weights, _knots)
     return _tmp_out, _tmp_se3
     
+cpdef py_se3_matrix(np.ndarray se3):
+    cdef n = se3.shape[0]
+    cdef np.ndarray m = np.empty_like((n,4,4), dtype=np.double)
+    cdef double* _m = <double*> m.data
+    cdef double* _src = <double*>se3.data
+
+    for i in xrange(n):
+        se3_to_matrix(_m, _src)    
+        _m += 16
+        _src += 7
+    
+    return m

@@ -48,14 +48,18 @@ struct SplineConstraint {
         for (size_t i=0; i < num_params_; ++i) {
             _spline.add_knot((T*)(&parameters[i][0]));
         }
+		
 		//_var_dump0(100);
+
 		for (size_t i=0; i!=num_tiles_; ++i){
 			size_t begin = tiles_[i*2];
 			size_t end = tiles_[i*2+1];
 
-			_var_dump3(101, i, begin, end );		//--dbg
+			//_var_dump3(101, i, begin, end );		//--dbg
 			residuals[i] = _calculate_res(_spline, begin,end);
+			//_var_dump4(101, i, begin, end, &residuals[i] );		//--dbg
 		}
+		//_var_dump1(102, residuals);
 		return true;
 	}
 
@@ -66,8 +70,7 @@ struct SplineConstraint {
 			M3x1 cur_src  = M3x1(&src_[i*3]);
 			M3x1 cur_norm = M3x1(&src_norm_[i*3]);
 
-			//_var_dump4(200, i, ref_, ref_norm_, src_);
-			//_var_dump4(201, i, cur_ref.data(), cur_norm.data(), cur_src.data());
+			//_var_dump4(201, i, cur_ref.data(), cur_src.data(), cur_norm.data());
 
             SE3Group<double> P0, P1;
             spline.evaluate( ref_ts_[i], P0);
@@ -88,7 +91,7 @@ struct SplineConstraint {
 			rs += abs(diff);
 			//_var_dump2(205, &rs, &diff);
 		}
-		return rs;
+		return rs/(end-begin);
     }
 
 	const double* ref_; 
@@ -182,9 +185,8 @@ void spline_fusion(
     cout << "\n\n------------------------- NUMERIC ------------------------------------" << endl;
     CostFunType* cost_func_numeric = new CostFunType(constraint);
     
-	//_var_dump5(300, ref, ref_norm, ref_ts, src, src_ts);
-	//_var_dump4(301, tiles, num_tiles, &ts_offset, &ts_step);
-	//_var_dump2(302, params_data, num_params);
+	//_var_dump5(300, ref, ref_ts, src, src_norm, src_ts);
+	//_var_dump4(301, tiles, num_tiles, params_data, num_params);
 
     run_solver(cost_func_numeric, solver_options, params_data, num_params, num_tiles);
 }
