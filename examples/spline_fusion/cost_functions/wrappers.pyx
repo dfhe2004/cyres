@@ -101,7 +101,7 @@ cpdef py_spline_eval(np.ndarray xyz, np.ndarray weights, np.ndarray knots, bool 
     return _tmp_out, _tmp_se3
     
 cpdef py_se3_matrix(np.ndarray se3):
-    cdef n = se3.shape[0]
+    cdef size_t n = se3.shape[0]
     cdef np.ndarray m = np.empty_like((n,4,4), dtype=np.double)
     cdef double* _m = <double*> m.data
     cdef double* _src = <double*>se3.data

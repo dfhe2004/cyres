@@ -32,28 +32,16 @@ Eigen::Matrix<T, 4, 1> spline_B(T u) {
 template<typename T>
 class UniformSpline {
 public:
-    typedef SE3Group<T> SE3Type;
-    typedef Eigen::Matrix<T, 4, 4> SE3DerivType;
+    typedef SE3Group<T>			SE3Type;
+	typedef Eigen::Map<SE3Type> MapType;
+    typedef Eigen::Matrix<T, 4, 4> Mat4;
+    typedef Eigen::Matrix<T, 4, 1> Vec4;
     typedef Eigen::Matrix<T, 3, 1> Vec3;
 
     size_t num_knots() const { return knots_.size(); }
     void add_knot(T* data){
-		knots_.push_back(data);
+		knots_.push_back(MapType(data));
 	}
-
-    Eigen::Map<SE3Type> get_knot(size_t i) const {
-        return Eigen::Map<SE3Type>(knots_[i]);
-    }
-
-    double* get_knot_data(size_t i) const{
-		if (i < knots_.size()) {
-            return knots_[i];
-        }
-        else {
-            throw std::out_of_range("Knot does not exist");
-        }
-    }
-
 
     /** Evaluate spline (pose and its derivative)
      * This gives the current pose and derivative of the spline.
@@ -61,13 +49,13 @@ public:
      * the spline coordinate frame, to the world coordinate frame.
      * X_world = P X_spline
      */
-    void evaluate(T t, SE3Type& P) const;
+    void evaluate(SE3Type& P, T t, const Vec4& weights) const;
 
-    double min_time() const {
+    T min_time() const {
 		return 0.0;
     };
 	
-    double max_time() const {
+    T max_time() const {
         if (num_knots() > 0)
             return num_knots() - 3;
         else
@@ -75,64 +63,54 @@ public:
     };
 
 protected:
-	std::vector<T*> knots_;
+	std::vector<SE3Type> knots_;
 };
 
 template<typename T>
-void UniformSpline<T>::evaluate(T t, SE3Type &P) const {
-    typedef Eigen::Matrix<T, 4, 4> Mat4;
-    typedef Eigen::Matrix<T, 4, 1> Vec4;
-    typedef Eigen::Map<SE3Type> KnotMap;
-	
-	// Remove offset
-	size_t i0 = floor(t);			 // [0,n-3)
-    T u = t - i0;				
-
-    P = Eigen::Map<SE3Type>(knots_[i0]);
-    Vec4 B = spline_B(u);
+void UniformSpline<T>::evaluate(SE3Type& P, T t, const Vec4& weights) const {
+	size_t i0 = floor(t);		// [0,n-3)
+    P = knots_[i0];		//Eigen::Map<SE3Type>(knots_[i0]);
 
     for(size_t j=1; j!=4; ++j) {
-        KnotMap knot1 = Eigen::Map<SE3Type>(knots_[i0+j-1]);
-        KnotMap knot2 = Eigen::Map<SE3Type>(knots_[i0+j]);
+        SE3Type knot1 = knots_[i0+j-1]; //Eigen::Map<SE3Type>(knots_[i0+j-1]);
+        SE3Type knot2 = knots_[i0+j];	//Eigen::Map<SE3Type>(knots_[i0+j]);
         typename SE3Type::Tangent omega = SE3Type::log(knot1.inverse() * knot2);
         Mat4 omega_hat = SE3Type::hat(omega);
-        SE3Type Aj = SE3Type::exp(B(j) * omega);
+        SE3Type Aj = SE3Type::exp(weights(j) * omega);
         P *= Aj;
     }
 }
 
 void spline_evaluate(double* out, double* se3, const double* xyz, const double* weights,  const double* knots){
-    typedef UniformSpline<double>::SE3Type	_SE3Type;
-	typedef Eigen::Map<_SE3Type>			_MapType;
-	typedef Eigen::Matrix<double, 3, 1>		_M3x1;
+    typedef UniformSpline<double>	_SplineType;
+	typedef _SplineType::SE3Type	SE3Type;
+	typedef _SplineType::MapType	MapType;
+	typedef _SplineType::Vec3		Vec3;
 	
-	const size_t stride = _SE3Type::num_parameters;
+	const size_t stride = SE3Type::num_parameters;
 	
-	_SE3Type P = _MapType((double*)knots);		// inplace ??
+	SE3Type P = MapType((double*)knots);		// inplace ??
 	knots += stride;
     for(size_t j=1; j!=4; ++j) {
-        _SE3Type knot1 = _MapType((double*)(knots-stride));
-        _SE3Type knot2 = _MapType((double*)knots);
-        _SE3Type::Tangent omega = _SE3Type::log(knot1.inverse() * knot2);
-        Eigen::Matrix<double, 4, 4> omega_hat = _SE3Type::hat(omega);
-        _SE3Type Aj = _SE3Type::exp(weights[j] * omega);
+        SE3Type knot1 = MapType((double*)(knots-stride));
+        SE3Type knot2 = MapType((double*)knots);
+        SE3Type::Tangent omega = SE3Type::log(knot1.inverse() * knot2);
+        Eigen::Matrix<double, 4, 4> omega_hat = SE3Type::hat(omega);
+        SE3Type Aj = SE3Type::exp(weights[j] * omega);
         P *= Aj;
 		knots += stride;
     }
 	
-	_M3x1 pt = _M3x1(xyz);
-	pt = P*pt;
-
+	Vec3 pt = P*Vec3(xyz);
 	memcpy(out, pt.data(), sizeof(pt));
 	if (se3!=NULL){
-		memcpy(se3, P.data(), sizeof(se3[0])*_SE3Type::num_parameters );
+		memcpy(se3, P.data(), sizeof(se3[0])*SE3Type::num_parameters );
 	}
 }
 
 void se3_to_matrix(double* out, double* se3){
-    typedef UniformSpline<double>::SE3Type	_SE3Type;
-	typedef Eigen::Map<_SE3Type>			_MapType;
-	memcpy(out, _MapType(se3).matrix().data(), sizeof(se3[0])*16);
+    typedef UniformSpline<double>::MapType	MapType; 
+	memcpy(out, MapType(se3).matrix().data(), sizeof(se3[0])*16);
 }
 
 #endif //SE3_SPLINE_H

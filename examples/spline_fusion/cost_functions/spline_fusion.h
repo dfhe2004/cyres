@@ -17,8 +17,9 @@ using std::endl;
 
 
 struct SplineConstraint {
-	typedef Eigen::Matrix<double, 3, 1> M3x1;
-    typedef UniformSpline<double>       SplineType;
+    typedef UniformSpline<double>   SplineType;
+	typedef SplineType::Vec3		Vec3;
+	typedef SplineType::Vec4		Vec4;
 
     SplineConstraint(size_t num_params): 
         num_params_(num_params){}
@@ -39,14 +40,27 @@ struct SplineConstraint {
         num_tiles_ = num_tiles;
     }
 
-	size_t num_tiles() const {	return num_tiles_; }
+	void prepare_spline_weights(){
+		ref_w_.clear();
+		src_w_.clear();
+
+		int total = tiles_[num_tiles_*2+1];
+		for(int i=0; i!=total; ++i){
+			Vec4 val = spline_B(ref_ts_[i] - floor(ref_ts_[i]));
+			ref_w_.push_back(val);
+
+			val = spline_B(src_ts_[i] - floor(src_ts_[i]));
+			src_w_.push_back(val);
+		}
+	}
+
 
     template<typename T>
     bool operator()(T const* const* parameters, T* residuals) const {
 		// update spline
         SplineType _spline;
         for (size_t i=0; i < num_params_; ++i) {
-            _spline.add_knot((T*)(&parameters[i][0]));
+            _spline.add_knot((T*)(parameters[i]));
         }
 		
 		//_var_dump0(100);
@@ -66,15 +80,15 @@ struct SplineConstraint {
 	double _calculate_res(const SplineType& spline, size_t begin, size_t end) const{
 		double rs = 0;
 		for(size_t i=begin; i!=end; ++i){
-			M3x1 cur_ref = M3x1(&ref_[i*3]);
-			M3x1 cur_src  = M3x1(&src_[i*3]);
-			M3x1 cur_norm = M3x1(&src_norm_[i*3]);
+			Vec3 cur_ref  = Vec3(&ref_[i*3]);
+			Vec3 cur_src  = Vec3(&src_[i*3]);
+			Vec3 cur_norm = Vec3(&src_norm_[i*3]);
 
 			//_var_dump4(201, i, cur_ref.data(), cur_src.data(), cur_norm.data());
 
             SE3Group<double> P0, P1;
-            spline.evaluate( ref_ts_[i], P0);
-            spline.evaluate( src_ts_[i], P1);
+            spline.evaluate(P0, ref_ts_[i], ref_w_[i]);
+            spline.evaluate(P1, src_ts_[i], src_w_[i]);
 			
 			//_var_dump2(202, P0.matrix().data(), P1.matrix().data());
 
@@ -105,25 +119,18 @@ struct SplineConstraint {
 	size_t num_tiles_;
 
     size_t num_params_;
+	std::vector<Vec4> ref_w_;
+	std::vector<Vec4> src_w_;
 };
 
-void init_params(double* data, size_t num_parmas){
-    UniformSpline<double>::SE3Type identity;
-    for (size_t i=0; i < num_parmas; ++i) {
-        memcpy(data, identity.data(), sizeof(data[0]) * Sophus::SE3d::num_parameters);
-        data +=Sophus::SE3d::num_parameters; 
-    }
-}
 
 
-typedef ceres::DynamicNumericDiffCostFunction<SplineConstraint> CostFunType; 
-
-//template<typename T>
-void run_solver(CostFunType* cost_func, ceres::Solver::Options& solver_options, double* params, size_t num_params, size_t num_res) {
+template<typename T>
+void run_solver(T* cost_func, ceres::Solver::Options& solver_options, double* params, size_t num_params, size_t num_res) {
 
     // One parameter block per spline knot
     std::vector<double*> parameter_blocks;
-    const size_t _stride = Sophus::SE3d::num_parameters;
+    const size_t _stride = Sophus::SE3f::num_parameters;
 
 	for (size_t i=0; i < num_params; ++i) {
         parameter_blocks.push_back(&params[i*_stride]);
@@ -164,14 +171,13 @@ void spline_fusion(
 	size_t num_params,
 	size_t max_solver_time
 	) {
+	//typedef SplineConstraint<double> _ConstraintType; 
 	//-- prepare constrain
     SplineConstraint* constraint = new SplineConstraint(num_params);
     constraint->set_arr_ref(ref, ref_ts);
     constraint->set_arr_src(src, src_norm, src_ts);
     constraint->set_arr_tiles(tiles, num_tiles);
-
-    init_params(params_data, num_params);
-
+	constraint->prepare_spline_weights();
 
     // Solver options
     ceres::Solver::Options solver_options;
@@ -183,7 +189,7 @@ void spline_fusion(
 
     // 1) Numeric differentiation
     cout << "\n\n------------------------- NUMERIC ------------------------------------" << endl;
-    CostFunType* cost_func_numeric = new CostFunType(constraint);
+    auto cost_func_numeric = new ceres::DynamicNumericDiffCostFunction<SplineConstraint>(constraint);
     
 	//_var_dump5(300, ref, ref_ts, src, src_norm, src_ts);
 	//_var_dump4(301, tiles, num_tiles, params_data, num_params);
