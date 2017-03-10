@@ -6,8 +6,8 @@ from IPython import embed
 
 numpy.random.seed(123)
 
-#print os.getpid()
-#embed()
+print os.getpid()
+embed()
 
 class Spline(object):
     _C = numpy.array([
@@ -17,23 +17,21 @@ class Spline(object):
         [0, 0, 0, 1],
     ], dtype='f8')/6.
 
-    def __init__(self, ts_offset, ts_step, params):
-        self.ts_offset = ts_offset
-        self.ts_step = ts_step
+    def __init__(self, params):
         self._params = params
 
-    def weights(self, local_ts):
-        ts2 = local_ts*local_ts 
-        return numpy.c_[numpy.ones_like(local_ts), local_ts, ts2, ts2*local_ts]
+    def weights(self, u):
+        u2 = u*u 
+        return numpy.c_[numpy.ones_like(u), u, u2, u*u2]
     
-    def trans(self, xyz, ts, return_se3=False): 
+    def trans(self, xyz, local_ts, return_se3=False): 
         xyz = xyz.reshape(-1,3)
-        _ts = ts - self.ts_offset    # local ts
-        u = self.weights(_ts)        # nx4
-        u = u.dot(self._C.T)         # nx4
+        u = local_ts-numpy.floor(local_ts)
+        u = self.weights(u)          # nx4
+        u = u.dot(self._C.T)                # nx4
 
-        idxs = (_ts/self.ts_step).astype('i4') # nx1
-        assert idxs.max()<self._params.shape[0]-4
+        idxs = (local_ts).astype('i4') # nx1
+        assert idxs.max()<self._params.shape[0]-3
         rs = []
         for i, idx in enumerate(idxs):
             val = py_spline_eval(xyz[i], u[i], self._params[idx:idx+4], return_se3)
@@ -45,6 +43,8 @@ class Spline(object):
         xyz = numpy.vstack([e[0] for e in rs])
         se3 = numpy.vstack([e[1] for e in rs])
         return xyz, se3
+
+
 
 
 def _prepare_data():
@@ -69,7 +69,12 @@ def _prepare_data():
         [3,10],
     ], dtype='i4')
 
-    params = numpy.empty((15,7), dtype='f8')
+    #params = numpy.empty((15,7), dtype='f8')
+    params = numpy.empty((8,7), dtype='f8')
+    ee = numpy.r_[0,0,0,1,0,0,0]
+    params[:] = ee
+
+    
     return {
         'ref':      ref,
         'ref_ts':   ref_ts,
@@ -78,8 +83,11 @@ def _prepare_data():
         'src_ts':   src_ts,
         'tiles':    tiles,
         'params':   params,
-        'ts_offset':    ts_offset,
-        'ts_step':      ts_step,
+        #'ts_offset':    ts_offset,
+        #'ts_step':      ts_step,
+        'num_params':   params.shape[0],
+        'diff':         ((ref - src)*src_norm).sum(1),
+
     }
 
 
@@ -89,7 +97,7 @@ if __name__=='__main__':
     if 1:
         _data = _prepare_data()
     
-    if 0:
+    if 1:
         numpy.savez('d:/workspace/spline_fusion.npz',**_data)
     
     if 1:   #-- fusion
@@ -98,7 +106,7 @@ if __name__=='__main__':
         
         #print params
         
-    if 1:   #-- apply spline
+    if 0:   #-- apply spline
         spline = Spline(_data['ts_offset'], _data['ts_step'], _data['params'])
         ref_h = spline.trans(_data['ref'], _data['ref_ts'])
         ref_h2, ref_se3 = spline.trans(_data['ref'], _data['ref_ts'], return_se3=True)

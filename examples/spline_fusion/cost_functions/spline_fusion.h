@@ -44,7 +44,7 @@ struct SplineConstraint {
 		ref_w_.clear();
 		src_w_.clear();
 
-		int total = tiles_[num_tiles_*2+1];
+		int total = tiles_[num_tiles_*2-1];
 		for(int i=0; i!=total; ++i){
 			Vec4 val = spline_B(ref_ts_[i] - floor(ref_ts_[i]));
 			ref_w_.push_back(val);
@@ -63,17 +63,15 @@ struct SplineConstraint {
             _spline.add_knot((T*)(parameters[i]));
         }
 		
-		//_var_dump0(100);
+		_var_dump0(100);
 
 		for (size_t i=0; i!=num_tiles_; ++i){
 			size_t begin = tiles_[i*2];
 			size_t end = tiles_[i*2+1];
 
-			//_var_dump3(101, i, begin, end );		//--dbg
 			residuals[i] = _calculate_res(_spline, begin,end);
-			//_var_dump4(101, i, begin, end, &residuals[i] );		//--dbg
+			_var_dump4(101, i, begin, end, &residuals[i] );		//--dbg
 		}
-		//_var_dump1(102, residuals);
 		return true;
 	}
 
@@ -84,26 +82,26 @@ struct SplineConstraint {
 			Vec3 cur_src  = Vec3(&src_[i*3]);
 			Vec3 cur_norm = Vec3(&src_norm_[i*3]);
 
-			//_var_dump4(201, i, cur_ref.data(), cur_src.data(), cur_norm.data());
+			_var_dump4(201, i, cur_ref.data(), cur_src.data(), cur_norm.data());
 
             SE3Group<double> P0, P1;
             spline.evaluate(P0, ref_ts_[i], ref_w_[i]);
             spline.evaluate(P1, src_ts_[i], src_w_[i]);
 			
-			//_var_dump2(202, P0.matrix().data(), P1.matrix().data());
+			_var_dump2(202, P0.matrix().data(), P1.matrix().data());
 
 			//-- apply P0, P1 to cur_ref ,cur_norm and cur_src
 			cur_ref  = P0*cur_ref;
 			cur_src  = P1*cur_src;
 			cur_norm = P1.so3()*cur_norm;
 			
-			//_var_dump3(203, cur_ref.data(), cur_src.data(), cur_norm.data());
+			_var_dump3(203, cur_ref.data(), cur_src.data(), cur_norm.data());
 			cur_norm.normalize();
-			//_var_dump1(204, cur_norm.data());
+			_var_dump1(204, cur_norm.data());
 
 			double diff = cur_norm.dot(cur_ref-cur_src); 
 			rs += abs(diff);
-			//_var_dump2(205, &rs, &diff);
+			_var_dump2(205, &rs, &diff);
 		}
 		return rs/(end-begin);
     }
@@ -130,7 +128,7 @@ void run_solver(T* cost_func, ceres::Solver::Options& solver_options, double* pa
 
     // One parameter block per spline knot
     std::vector<double*> parameter_blocks;
-    const size_t _stride = Sophus::SE3f::num_parameters;
+    const size_t _stride = Sophus::SE3d::num_parameters;
 
 	for (size_t i=0; i < num_params; ++i) {
         parameter_blocks.push_back(&params[i*_stride]);
@@ -191,8 +189,8 @@ void spline_fusion(
     cout << "\n\n------------------------- NUMERIC ------------------------------------" << endl;
     auto cost_func_numeric = new ceres::DynamicNumericDiffCostFunction<SplineConstraint>(constraint);
     
-	//_var_dump5(300, ref, ref_ts, src, src_norm, src_ts);
-	//_var_dump4(301, tiles, num_tiles, params_data, num_params);
+	_var_dump5(300, ref, ref_ts, src, src_norm, src_ts);
+	_var_dump4(301, tiles, num_tiles, params_data, num_params);
 
     run_solver(cost_func_numeric, solver_options, params_data, num_params, num_tiles);
 }

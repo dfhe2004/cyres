@@ -69,11 +69,11 @@ protected:
 template<typename T>
 void UniformSpline<T>::evaluate(SE3Type& P, T t, const Vec4& weights) const {
 	size_t i0 = floor(t);		// [0,n-3)
-    P = knots_[i0];		//Eigen::Map<SE3Type>(knots_[i0]);
+    P = knots_[i0];				
 
     for(size_t j=1; j!=4; ++j) {
-        SE3Type knot1 = knots_[i0+j-1]; //Eigen::Map<SE3Type>(knots_[i0+j-1]);
-        SE3Type knot2 = knots_[i0+j];	//Eigen::Map<SE3Type>(knots_[i0+j]);
+        SE3Type knot1 = knots_[i0+j-1]; 
+        SE3Type knot2 = knots_[i0+j];	
         typename SE3Type::Tangent omega = SE3Type::log(knot1.inverse() * knot2);
         Mat4 omega_hat = SE3Type::hat(omega);
         SE3Type Aj = SE3Type::exp(weights(j) * omega);
