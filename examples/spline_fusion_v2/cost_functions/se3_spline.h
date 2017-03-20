@@ -14,6 +14,9 @@ using std::memcpy;
 
 #include <sophus/se3.hpp>
 #include <Eigen/Dense>
+#include <pydbg.h>
+
+
 using Sophus::SE3Group;
 using Sophus::SE3;
 
@@ -79,10 +82,15 @@ void spline_evaluate(double* out, double* se3, const double* xyz, const double* 
 	
 	SE3Type P = MapType((double*)knots);		// inplace ??
 	knots += stride;
-    for(size_t j=1; j!=4; ++j) {
-        SE3Type knot1 = MapType((double*)(knots-stride));
+	_var_dump3(1000, (void*)xyz, (void*)weights, (void*)knots);
+    
+	for(size_t j=1; j!=4; ++j) {
+		SE3Type knot1 = MapType((double*)(knots-stride));
         SE3Type knot2 = MapType((double*)knots);
-        SE3Type::Tangent omega = SE3Type::log(knot1.inverse() * knot2);
+        
+		_var_dump3(1001, j, knot1.data(), knot2.data());
+
+		SE3Type::Tangent omega = SE3Type::log(knot1.inverse() * knot2);
         Eigen::Matrix<double, 4, 4> omega_hat = SE3Type::hat(omega);
         SE3Type Aj = SE3Type::exp(weights[j] * omega);
         P *= Aj;
@@ -90,6 +98,8 @@ void spline_evaluate(double* out, double* se3, const double* xyz, const double* 
     }
 	
 	Vec3 pt = P*Vec3(xyz);
+	_var_dump2(1002, P.data(), pt.data());
+
 	memcpy(out, pt.data(), sizeof(pt));
 	if (se3!=NULL){
 		memcpy(se3, P.data(), sizeof(se3[0])*SE3Type::num_parameters );

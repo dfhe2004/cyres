@@ -103,7 +103,8 @@ def _dump2csv(fname, arr):
 if __name__=='__main__':
     if 1:
         _data = _prepare_data()
-    
+        
+        embed()
     if 0:
         _fname = 'd:/workspace/tmp/%s.csv'
         for k,v in _data.items():

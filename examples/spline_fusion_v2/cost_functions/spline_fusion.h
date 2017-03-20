@@ -71,42 +71,38 @@ struct SplineConstraint {
         }
 		
 		_var_dump1(100, tile_idx_);
-		residuals[0] = _calculate_res(_spline);
-		_var_dump2(102, tile_idx_, residuals);
+		for (size_t i=0; i!=num_points_; ++i ){
+			_calculate_res(&residuals[3*i], i, _spline);
+		}
+
+		_var_dump1(102, residuals);
 		return true;
 	}
 
 
 	//-- utils 
-	double _calculate_res(const SplineType& spline) const{
-		double rs = 0;
-		for(size_t i=0; i!=num_points_; ++i){
+	void _calculate_res(double* res, size_t i, const SplineType& spline) const{
 			Vec3 cur_ref  = Vec3(&ref_[i*3]);
 			Vec3 cur_src  = Vec3(&src_[i*3]);
-			Vec3 cur_norm = Vec3(&src_norm_[i*3]);
 
-			_var_dump5(201, tile_idx_, i, cur_ref.data(), cur_src.data(), cur_norm.data());
+			_var_dump3(201, i, cur_ref.data(), cur_src.data());
 
             SE3Group<double> P0, P1;
-            spline.evaluate(P0, ts2params_[0],	ref_w_[i]);		// ref 
-            spline.evaluate(P1, ts2params_[i+1],src_w_[i]);
+            spline.evaluate(P0, ts2params_[0],	src_w_[i]);		// src 
+            spline.evaluate(P1, ts2params_[i+1],ref_w_[i]);
 			
-			_var_dump2(202, P0.matrix().data(), P1.matrix().data());
+			_var_dump5(202, &ts2params_[0], &src_w_[i], &ref_w_[i], P0.data(), P1.data());
 
 			//-- apply P0, P1 to cur_ref ,cur_norm and cur_src
-			cur_ref  = P0*cur_ref;
-			cur_src  = P1*cur_src;
-			cur_norm = P1.so3()*cur_norm;
+			cur_src  = P0*cur_src;
+			cur_ref  = P1*cur_ref;
 			
-			_var_dump3(203, cur_ref.data(), cur_src.data(), cur_norm.data());
-			cur_norm.normalize();
-			_var_dump1(204, cur_norm.data());
-
-			double diff = cur_norm.dot(cur_ref-cur_src); 
-			rs += abs(diff);
-			_var_dump2(205, &rs, &diff);
-		}
-		return rs/num_points_;
+			_var_dump2(203, cur_ref.data(), cur_src.data());
+			
+			Vec3 diff = cur_ref-cur_src;
+			res[0] = diff(0);
+			res[1] = diff(1);
+			res[2] = diff(2);
     }
 
 	const double* ref_; 
@@ -195,7 +191,7 @@ void SplineFusion::add_cost_functor(size_t tile_idx, const int* params_idx, size
 		param_blocks.push_back(&params_data_[at]);
         cost_functor->AddParameterBlock(STRIDE); 
 	}
-    cost_functor->SetNumResiduals(1);
+    cost_functor->SetNumResiduals(3*(end-begin));
     problem_.AddResidualBlock(cost_functor, NULL, param_blocks);	// debug later, try other loss functions!!
 }
 
@@ -217,6 +213,8 @@ void SplineFusion::run_solver(){
     solver_options.linear_solver_type = ceres::SPARSE_SCHUR;
     solver_options.minimizer_progress_to_stdout = true;
     solver_options.parameter_tolerance = 1e-4;
+    //solver_options.max_num_iterations = 500;
+    //solver_options.num_threads = 1;
 
 
     // 1) Numeric differentiation

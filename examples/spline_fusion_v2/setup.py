@@ -25,7 +25,9 @@ ext_modules = [
         #extra_compile_args=["-Zi", "/Od", "/EHsc"], #debug
         #extra_link_args=["-debug",],
         
-        extra_compile_args=["/O2"],     #release
+        #extra_compile_args=["/O2",],     #release
+        extra_compile_args=["/O2", '/D "NPYDBG"'],     #release
+        
         include_dirs=[ceres_include, ceres_cfg, numpy.get_include(), eigen_include],
         #libraries=['ceresd','gflags', 'libglog','pydbg' ],
         
